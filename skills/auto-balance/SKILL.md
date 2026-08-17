@@ -159,8 +159,13 @@ discipline, keyed on a stable device identity.
 other. Claim by serial (`adb -s <serial>` / `$ANDROID_SERIAL`), never by index. Check device *state*
 before use — `unauthorized`, `offline` and `recovery` are not `device`. Expect a disappearing-device
 window around `adb reboot`, `adb root`, an install, and any `tcpip` switch: wait for it back rather
-than failing. Never `adb kill-server` while another session may be mid-install. For emulators use
-`-port <even 5554..5584>` (adb is console+1); adb only scans up to 5585.
+than failing. Never `adb kill-server` while another session may be mid-install.
+
+**Emulators are a policy decision, not a default.** An emulator or simulator is one of the heaviest
+processes on the box and will push a loaded machine into swap or an OOM kill that lands on another
+session's build — record the project's policy in `.agent/balance.json` at setup and honour it. Where
+they are permitted, pin each to its own AVD and use `-port <even 5554..5584>` (adb is console+1);
+adb only scans up to 5585.
 
 **Serial boards.** Take the lease **before** invoking `esptool` — esptool's own exclusive open detects
 a collision but does not prevent the damage, and any "is the port free?" probe that opens the tty

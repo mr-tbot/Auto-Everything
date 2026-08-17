@@ -242,12 +242,16 @@ theme and breakpoint you touched:
 npx playwright screenshot --viewport-size=390,844 http://localhost:3000/ shot-mobile.png
 # in tests: await expect(page).toHaveScreenshot('home-light-1280.png', { fullPage: true, maxDiffPixelRatio: 0.01 })
 adb exec-out screencap -p > android.png
-xcrun simctl io booted screenshot ios.png
+xcrun simctl io booted screenshot ios.png   # simulator — use a real device where policy requires it
 flutter test --update-goldens
 ```
 
 Headless Chrome's `--screenshot` works **only** in headless mode — the same command without
 `--headless` writes no file and exits silently — and never captures beyond the window box.
+
+Capture from real hardware where it is attached and where the project's device policy requires it —
+a simulator renders fonts, safe areas and scaling differently enough to hide exactly the bugs this
+pass is looking for.
 
 Kill the flake sources before diffing: disable animations, mask timestamps and dynamic content, pin
 device scale factor, install the fonts. A green visual diff where both sides are broken is not a pass.

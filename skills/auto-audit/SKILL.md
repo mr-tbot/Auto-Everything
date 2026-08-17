@@ -43,9 +43,15 @@ looked clean.
 6. **Go to 1.** Stop only when a complete pass finds nothing new on any target.
 
 **Targets you genuinely cannot reach** (no hardware, no license, no runner) get named explicitly,
-with what's missing and what it would take. Try the cheap substitutes first — emulator, VM,
-container, CI runner, cross-compile plus a smoke run, a borrowed device. An unreachable target is
-reported as unverified, never counted as done.
+with what's missing and what it would take. Try the cheap substitutes first — VM, container, CI
+runner, cross-compile plus a smoke run, a borrowed device. An unreachable target is reported as
+unverified, never counted as done.
+
+**Respect the project's device policy.** Where real hardware is attached, it is the target — an
+emulator or simulator is a fallback, not an equivalent, and some projects forbid them outright
+(they are heavy enough to destabilise a shared build machine, and they do not reproduce real
+hardware behaviour). Check the policy before starting one; absent a policy, prefer hardware and
+label any emulator result as such. Never silently substitute an emulator for the device.
 
 **One pass is never enough.** Every pass finds real defects the previous one missed — including in
 code written earlier in the same session. A pass that finds nothing on its first run means the audit
@@ -80,7 +86,7 @@ means per target:
 
 | Target | Verified by |
 |--------|-------------|
-| Mobile OS | Physical device (or emulator, named as such), driven, logs read |
+| Mobile OS | Physical device, driven, logs read. An emulator only where policy permits, and labelled as an emulator result |
 | Desktop OS | The app running on that OS — not "it's the same Electron bundle" |
 | Browser | Each supported engine, not only the one you develop in |
 | Server / service | Deployed or containerized run hitting real endpoints, logs tailed |

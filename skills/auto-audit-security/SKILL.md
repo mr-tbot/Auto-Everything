@@ -8,22 +8,34 @@ description: "Use when a codebase needs an adversarial security review or compli
 An adversarial security review of this codebase, plus an honest compliance-readiness assessment —
 findings first, fixes only when you approve them.
 
-**The boundary, stated once and never blurred: this skill cannot make anything compliant or
-certified.** SOC 2 is an attestation issued by a licensed CPA firm after examining an organization
-over a period of time. ISO 27001 is certified by an accredited body. What this skill produces is a
-**readiness assessment**: which technical controls are evidenced in the code, which are missing, and
-what an auditor will ask for that no repository can answer. Anyone who tells you a scan produces SOC 2
-is selling something.
+**The boundary, stated once and never blurred: a code audit produces INPUT EVIDENCE to a compliance
+program. It never produces the compliance artifact.** SOC 2 is an attestation engagement performed
+under SSAE 18 by an independent licensed CPA firm; ISO 27001 is certified by an accredited body. What
+this skill produces is a **readiness assessment**: which technical controls are evidenced in the code,
+which are missing, and what an auditor will ask for that no repository can answer.
+
+Two facts worth getting right, because vendors routinely get them wrong:
+
+- The Trust Services Criteria comprise **61 criteria**, of which **18 are the privacy category**.
+  Higher counts in circulation (64, 80+) come from counting *points of focus* as criteria — they are
+  explicitly not criteria.
+- **A SOC 2 report is restricted-use. SOC 3 is the general-use report.** If the goal is something
+  publishable on a marketing site, that is SOC 3, and confusing the two misdirects the whole effort.
+
+Everything this skill generates is **IPE — information produced by the entity.** A service auditor
+will test its completeness and accuracy before relying on it, so every artifact must record how it was
+produced, over what population, and at what time.
 
 ## Step 1 — Scope And Authorization
 
 Establish before running anything:
 
 1. **What is in scope** — repo only, or deployed environments too? Which environments?
-2. **Authorization for active testing.** Static review of code you own needs none. **Any active scan
-   (ZAP, nuclei, fuzzing, credential testing) requires explicit authorization for the specific target,
-   and must never be pointed at production, at shared infrastructure, or at a third party.** Staging,
-   or a local instance, or not at all.
+2. **Authorization for active testing, in writing.** Static review of code you own needs none. **Any
+   active scan (ZAP, nuclei, fuzzing, credential testing) requires explicit written authorization
+   naming the specific target, and must never be pointed at production, at shared infrastructure, or
+   at a third party.** Staging, a local instance, or not at all. Third-party-hosted components have
+   their own testing policies and are frequently out of bounds regardless of who owns the account.
 3. **Which frameworks matter** — SOC 2, ISO 27001, HIPAA, PCI DSS, GDPR/CCPA, or none. Ask; do not
    assume, since the applicable set drives everything downstream.
 4. **Where findings may be written.** Not a public issue tracker. See Handling below.
@@ -86,9 +98,10 @@ request** from state the user cannot write.
 
 ## Step 5 — The Rest Of The Classes
 
-Cover the current OWASP Top 10 and API Security Top 10 — **pull the current edition and its category
-codes at audit time rather than reciting them, because the editions and codes change** and a stale
-category reference undermines the report.
+Cover the current OWASP Top 10 and API Security Top 10. **Always name the edition — write `A01:2025`,
+never a bare `A01` or "OWASP Top 10"** — and confirm which edition any scanner ruleset actually
+encodes before citing it as coverage. Supply-chain findings map to **A03:2025 Software Supply Chain
+Failures**. Pull the current codes at audit time rather than reciting them.
 
 By class, with the concrete question to answer in this codebase:
 
@@ -114,39 +127,58 @@ By class, with the concrete question to answer in this codebase:
 ## Step 6 — Run The Scanners, Then Distrust Them
 
 Automation is the floor, not the audit. It is good at known-vulnerable dependencies and hardcoded
-secrets, and poor at logic and access control.
+secrets, and poor at logic and access control. **State that in the report**: the access-control
+findings in Step 3 have no tool path at all, so a reader must not read a clean scan section as
+covering them.
+
+**Separate the reporting run from the gating run.** They need different flags, and combining them is
+how a gate silently narrows: a filter that reduces noise in a report also reduces what the gate can
+fail on.
 
 ```bash
-# SAST
-pipx run semgrep scan --config=auto --sarif -o semgrep.sarif .
-pipx run bandit -r src/ -f json -o bandit.json          # Python
-gosec -fmt=json -out=gosec.json ./...                    # Go
+# SAST — --error is required for gating; semgrep exits 0 with findings without it
+semgrep --config=<pinned-local-rules> --sarif -o semgrep.sarif --metrics=off .        # report
+semgrep --config=<pinned-local-rules> --error --metrics=off .                          # gate
+pipx install 'bandit[toml,sarif]' && bandit -r src/ -f sarif -o bandit.sarif           # exits 1 on findings
+gosec -fmt=json -out=gosec.json ./...
 
 # dependencies — prefer reachability where available
-osv-scanner scan source -r .
-govulncheck ./...                                        # Go, reachability-aware
-pip-audit -r requirements.txt
-cargo audit
-npm audit --omit=dev
-trivy fs --scanners vuln,secret,misconfig .
+osv-scanner scan source -r .          # 0 = clean, 1 = findings, 128 = TOOL FAILURE, never a pass
+govulncheck ./...                      # Go, reachability-aware
+pip-audit -r requirements.txt ; cargo audit ; npm audit --omit=dev
+grype <target> --only-fixed -o table                  # report: actionable subset
+grype <target> --fail-on high -o json --file out.json # gate: no fix-state filter
+trivy fs --scanners vuln,secret,misconfig,license --severity HIGH,CRITICAL --exit-code 1 \
+     --format sarif -o trivy.sarif .                   # 0 clean, 1 findings, other = tool error
 
 # secrets — history, not just the working tree
 gitleaks detect --source . --redact --report-format sarif --report-path gitleaks.sarif
-trufflehog git file://. --no-verification --results=unverified,unknown
+trufflehog git file://. --no-verification --fail --json | jq 'del(.Raw, .RawV2)' > /secure/path/th.json
 
 # IaC / container
-checkov -d . --compact
-trivy config .
+checkov -d . --compact ; trivy config .
 ```
 
-Two rules about the tooling:
+Four rules about the tooling:
 
-**`trufflehog` verification mode makes outbound requests using the credentials it finds.** That is
-sometimes what you want and sometimes a disclosure. Default to `--no-verification` unless liveness
-checking is explicitly authorized.
+**Exit codes are per-tool, and several default to 0 with findings.** Verify each one's documented
+contract and gate on it explicitly. `osv-scanner` exit **128 is a hard failure of the audit itself** —
+treating it as a pass means you shipped on a scan that never ran. `bandit`'s `-c pyproject.toml` errors
+if the file has no `[tool.bandit]` table, so a repo without that section needs the flag dropped, not
+added.
 
-**A security gate must fail closed.** Check exit codes deliberately — a pipeline that treats any
-non-zero as "tool error, continue" turns a finding into a pass.
+**Record what was actually scanned.** Every scan's evidence entry needs the count of packages or files
+examined. A misconfigured scan that examined nothing produces a clean report indistinguishable from a
+secure codebase.
+
+**Scanners exfiltrate.** `semgrep --config=auto` and registry packs fetch rules and send metrics; use
+pinned local rules and `--metrics=off` for confidential code, and `osv-scanner --offline
+--offline-vulnerabilities` with a pre-downloaded database when the dependency list itself is sensitive.
+
+**`trufflehog` verification mode authenticates with the credentials it finds** — real outbound requests
+using live secrets. Use `--no-verification` for the inventory pass; `--results=verified` only with
+written scope naming verification as permitted, and tell whoever watches the logs first. Never write
+its JSON into the repo tree, and strip `.Raw`/`.RawV2` before any human sees or stores it.
 
 **Active scanning (ZAP, nuclei) only against an authorized non-production target**, and never as a
 default step.
@@ -200,8 +232,14 @@ customer records outranks a dozen medium-severity dependency advisories in code 
 Separate the compliance-readiness section, with the four-way verdict per control and a clear statement
 of scope and method.
 
-State coverage honestly at the top: what was reviewed, what was scanned, what was skipped, and what
-could not be verified without an environment you did not have.
+Open with a **scope, methodology and coverage** section: what was reviewed and how, the population
+covered (which branches, which commit, which environments), what each tool examined and how many
+items it actually saw, what was skipped, and what could not be verified without an environment you did
+not have. Name which classes have no automated coverage.
+
+Close the loop on lifecycle: every finding needs a state — open, fixed, or **risk-accepted with an
+owner and a date**. A finding nobody accepted and nobody fixed is still open, and silently dropping it
+between runs is how a report becomes fiction.
 
 ## Step 9 — Then Ask
 
@@ -248,6 +286,10 @@ attached, and that determination belongs to counsel — flag it, do not adjudica
 | "That CVE is in a dev dependency" | Then say so and rank it accordingly — but confirm it does not ship |
 | "I'll open an issue with the repro" | Not in a public tracker for an unfixed vulnerability |
 | "Severity is medium, the scanner said so" | Rank by exploitability and impact in *this* system |
+| "The scan passed" | Check it scanned anything. Record the count of files and packages examined |
+| "Non-zero exit, probably a tool glitch" | osv-scanner 128 means the audit did not run. Fail closed |
+| "I'll cite A01 for this" | Name the edition — A01:2025. A bare code is ambiguous across editions |
+| "We want a SOC 2 report for the website" | SOC 2 is restricted-use. The public one is SOC 3 |
 | "We can fix it later, it's theoretical" | Then demonstrate it is unreachable. Otherwise it is a finding |
 
 ## Red Flags — Stop
@@ -256,7 +298,10 @@ attached, and that determination belongs to counsel — flag it, do not adjudica
 - Running an active scan without explicit authorization for that specific target
 - Pointing any scanner at production
 - Sampling routes for access control instead of enumerating all of them
-- Reciting a framework criterion id or OWASP category code without checking the current edition
+- Reciting a framework criterion id or OWASP category code without checking the current edition, or
+  citing an OWASP category without its edition year
+- Combining a report-narrowing filter with a gating flag in the same scanner run
+- Reporting a clean scan without recording how many files or packages it actually examined
 - Committing the findings report to a public repo, or putting a repro in a public issue
 - A CI security gate that continues on a non-zero exit
 - `trufflehog` with verification enabled against credentials you did not intend to test
