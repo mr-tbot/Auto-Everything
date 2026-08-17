@@ -25,7 +25,7 @@ whole thing quietly isn't done.
 | **auto-brand-parity** | Icons, logos and brand assets that disagree across Windows, macOS, Linux, iOS, Android and the web |
 | **auto-media-maker** | Onboarding, tutorial and launch video that silently went stale when the product moved |
 | **auto-balance** | Sessions that fight each other for CPU, RAM and hardware. Coordinates parallel builds, arbitrates devices, and sizes its own agent count so you never hit account limits |
-| **auto-issue-fix** | Reported bugs sitting unread across GitHub, Jira, Linear, Slack, ClickUp and your crash reporter. Finds them, fixes them, replies with the fix, updates the tracker |
+| **auto-issue-fix** | Reported bugs sitting unread across GitHub, Jira, Linear, Slack, ClickUp and your crash reporter. Finds them, fixes them with a regression test, replies with the fix, updates the tracker — reading freely, writing only under gates |
 | **auto-everything** | All of the above as one pass, in dependency order — issues in, code fixed, docs and media caught up, nothing shipped without your say-so |
 
 ## What they have in common
