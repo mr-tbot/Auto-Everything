@@ -26,6 +26,7 @@ whole thing quietly isn't done.
 | **auto-media-maker** | Onboarding, tutorial and launch video that silently went stale when the product moved |
 | **auto-balance** | Sessions that fight each other for CPU, RAM and hardware. Coordinates parallel builds, arbitrates devices, and sizes its own agent count so you never hit account limits |
 | **auto-issue-fix** | Reported bugs sitting unread across GitHub, Jira, Linear, Slack, ClickUp and your crash reporter. Finds them, fixes them with a regression test, replies with the fix, updates the tracker — reading freely, writing only under gates |
+| **auto-audit-security** | A system called secure because the scan was clean. Adversarial review of access control route by route, licensing and paywall bypass, secrets in shipped artifacts — plus an honest compliance-readiness assessment that never claims a certification only an auditor can issue |
 | **auto-everything** | All of the above as one pass, in dependency order — issues in, code fixed, docs and media caught up, nothing shipped without your say-so |
 
 ## What they have in common
@@ -76,7 +77,7 @@ Invoke any of them by name:
 /auto-audit          /auto-doc            /auto-balance
 /auto-rewrite        /auto-web            /auto-issue-fix
 /auto-license-check  /auto-brand-parity   /auto-everything
-/auto-ui-ux          /auto-media-maker
+/auto-ui-ux          /auto-media-maker    /auto-audit-security
 ```
 
 Or let them trigger themselves. Each description fires on the moment it applies — when an agent is
